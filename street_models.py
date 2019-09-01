@@ -23,14 +23,11 @@ class StreetGrid:
     without the bias of discounting.
     """
 
-    def __init__(self, size):
-        # Reward parameters. We model traffic as a log-normal RV
-        self.high_traffic = 5
-        self.med_traffic = 3
-        self.low_traffic = 1
-        self.high_sd = 5
-        self.med_sd = 3
-        self.low_sd = 1
+    def __init__(self, size, seed):
+        # Reward parameters. We model traffic as geometric RV 
+        self.high_traffic = .5
+        self.med_traffic = .7
+        self.low_traffic = .9
 
         # States
         self.grid_size = size
@@ -38,24 +35,60 @@ class StreetGrid:
         self.lost_epsilon = .01
 
         # Actions
-        self.a = self.init_s_to_a()
+        self.actions = self.init_s_to_a()
+
+        # Reward function
+        self.state_traffics = self.init_state_traffics()
+        self.r = self.r_geo
+        self.r_dist = self.build_dist(
+            [self.high_traffic, self.med_traffic, self.low_traffic])
 
         # Adjacency list
         self.adj = {}
+
+        # Set random seed
+        np.random.seed(seed)
+
+    def build_dist(self, params, high=15):
+        dist = {}
+
+        for param in params:
+            dist[param] = [StreetGrid.geometric_pdf(param, x) for x in range(high)]
+            dist[param].append(1 - StreetGrid.geometric_cdf(param, high - 1))
+
+        return dist
 
     def p(self, s, a):
         """
         p(s', r | s, a)
         """
+        p_dist = {}
         ss = self.next_state(s, a)
-        pass
+        r_dist = self.r_geo(s, a, ss)
+
+        for x in range(len(r_dist)):
+            rw = -x
+            p_dist[(ss, rw)] = r_dist[x]
         
+        return p_dist
+
+    @staticmethod
+    def geometric_pdf(p, x):
+        return p * (1 - p) ** x
     
-    def r(self, s, a, ss):
+    @staticmethod
+    def geometric_cdf(p, x):
+        return sum(StreetGrid.geometric_pdf(p, y) for y in range(x + 1))
+    
+    def r_geo(self, s, a, ss):
         """
         R(r | s, a, s')
         """
-        pass
+        assert ss == self.next_state(s, a)
+        x, y = ss
+        param = self.state_traffics[x, y]
+
+        return self.r_dist[param]
 
     def next_state(self, s, a):
         """
@@ -79,7 +112,7 @@ class StreetGrid:
         return xx, yy
 
     def a(self, s):
-        return self.a[s]
+        return self.actions[s]
 
     def init_s_to_a(self):
         def s_to_a(s):
@@ -101,6 +134,20 @@ class StreetGrid:
 
     def init_states(self):
         return list(product(range(self.grid_size), repeat=2))
+
+    def init_state_traffics(self):
+        # Get the number of rows and columns
+        nrows, ncols = self.grid_size, self.grid_size
+
+        # Populate the array with traffic values sampled uniformly at random
+        traffics = [self.low_traffic, self.med_traffic, self.high_traffic]
+        state_traffics = np.random.randint(len(traffics), size=(nrows, ncols))
+        traffics_mapper = lambda x: traffics[x]
+        arr_mapper = np.vectorize(traffics_mapper)
+
+        state_traffics = arr_mapper(state_traffics)
+
+        return state_traffics
 
     def check_bounds(self, s):
         x, y = s
