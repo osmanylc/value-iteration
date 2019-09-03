@@ -1,9 +1,18 @@
 import math
+from itertools import product
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
+
+from street_models import Action
+
 
 def value_iteration(mdp):
     # ::::: Initialize value and policy functions
     v = init_values(mdp)
-    pi = init_policy(mdp)
+    pi = {}
     tolerance = 1e-2
     residual = math.inf
     total_iterations = 10
@@ -18,11 +27,14 @@ def value_iteration(mdp):
 
         # ::::: Do value backup in each state
         for s in v.keys():
+            if s == mdp.terminal_state:
+                continue
+
             v_old = v[s]
             v_new = -math.inf
 
             # Get all actions possible in this state
-            acts = mdp.s_to_a(s)
+            acts = mdp.actions[s]
             # Loop over all actions and find one with highest val
             for act in acts:
                 v_temp = 0
@@ -38,10 +50,12 @@ def value_iteration(mdp):
             v[s] = v_new
             # Record max residual
             residual = max(residual, abs(v_new - v_old))
+            print(f'residual: {residual:10.4f}')
     
     # ::::: Build the greedy policy
-    for s in pi.keys():
-        acts = mdp.s_to_a(s)
+    print('\n::::: Building policy...')
+    for s in v.keys():
+        acts = mdp.actions[s]
         v_max = -math.inf
         a_max = None
 
@@ -56,13 +70,92 @@ def value_iteration(mdp):
                 a_max = act
 
         pi[s] = a_max
+    print('Finished building policy.')
 
     return v, pi
 
 
 def init_values(mdp):
-    pass
+    v = {}
+
+    for s in mdp.states:
+        v[s] = 0
+    
+    return v
 
 
-def init_policy(mdp):
-    pass
+def d_to_arr(d):
+    max_coords = max(d)
+    arr_shape = tuple(x + 1 for x in max_coords)
+    d_arr = np.zeros(arr_shape)
+
+    for (s1, s2), val in d.items():
+        d_arr[s1, s2] = val
+    
+    return d_arr
+
+
+def visualize_values(v, title, fig_file):
+    v_arr = d_to_arr(v)
+    x_ran, y_ran = v_arr.shape
+
+    x = np.arange(x_ran)
+    y = np.arange(y_ran)
+
+    X, Y = np.meshgrid(x, y)
+
+    f = plt.figure()
+    ax = f.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, v_arr, cmap=cm.viridis)
+    f.colorbar(surf)
+
+    plt.title(title)
+    plt.ylabel('y')
+    plt.xlabel('x')
+    f.savefig(fig_file)
+
+
+def visualize_traffic(mdp, fig_file):
+    """
+    Color the nodes depending on how much traffic they get. 
+
+    High = RED, Medium = YELLOW, Low = GREEN
+    """
+    # Convert traffics to integers for plotting
+    success_prob_to_idx = {.9: 0, .7: 1, .5: 2}
+    idxs = np.vectorize(lambda x: success_prob_to_idx[x])(mdp.state_traffics)
+
+    # Plot the traffic values
+    f, _ = plt.subplots()
+    plt.imshow(idxs, cmap='RdYlGn', origin='lower')
+
+    plt.title('Node Traffic Congestion')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    f.savefig(fig_file)
+
+
+
+def visualize_policy(pi):
+    """
+    Draw an arrow at every cell representing the turn we want to make.
+    """
+    a_to_vec = {Action.UP: (0,1), Action.RIGHT: (1,0), 
+        Action.DOWN: (0,-1), Action.LEFT: (-1,0)}
+    # xy_to_vec = {(x,y): a_to_vec[a] for (x, y), a in pi.items}
+
+    pi_arr = d_to_arr(pi)
+    x_len, y_len = pi_arr.shape
+    U = np.zeros_like(pi_arr)
+    V = np.zeros_like(pi_arr)
+
+    for x, y in product(range(x_len), range(y_len)):
+        U[x,y] = a_to_vec[pi_arr[x,y]][0]
+        V[x,y] = a_to_vec[pi_arr[x,y]][1]
+    
+    X, Y = np.meshgrid(range(x_len), range(y_len))
+
+    f, ax = plt.subplots()
+    plt.quiver(X, Y, V, U)
+
+    return U, V

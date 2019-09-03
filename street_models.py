@@ -23,7 +23,7 @@ class StreetGrid:
     without the bias of discounting.
     """
 
-    def __init__(self, size, seed):
+    def __init__(self, size, seed=0):
         # Reward parameters. We model traffic as geometric RV 
         self.high_traffic = .5
         self.med_traffic = .7
@@ -32,6 +32,7 @@ class StreetGrid:
         # States
         self.grid_size = size
         self.states = self.init_states()
+        self.terminal_state = self.init_terminal_state()
         self.lost_epsilon = .01
 
         # Actions
@@ -42,9 +43,7 @@ class StreetGrid:
         self.r = self.r_geo
         self.r_dist = self.build_dist(
             [self.high_traffic, self.med_traffic, self.low_traffic])
-
-        # Adjacency list
-        self.adj = {}
+        self.discount = 1
 
         # Set random seed
         np.random.seed(seed)
@@ -121,19 +120,22 @@ class StreetGrid:
 
             if x + 1 < self.grid_size:
                 a.append(Action.RIGHT)
-            elif 0 <= x - 1:
+            if 0 <= x - 1:
                 a.append(Action.LEFT)
-            elif y + 1 < self.grid_size:
+            if y + 1 < self.grid_size:
                 a.append(Action.UP)
-            elif 0 <= y - 1:
+            if 0 <= y - 1:
                 a.append(Action.DOWN)
 
             return a
 
-        return [s_to_a(s) for s in self.states]
+        return {s: s_to_a(s) for s in self.states}
 
     def init_states(self):
         return list(product(range(self.grid_size), repeat=2))
+
+    def init_terminal_state(self):
+        return (self.grid_size - 1, self.grid_size - 1)
 
     def init_state_traffics(self):
         # Get the number of rows and columns
