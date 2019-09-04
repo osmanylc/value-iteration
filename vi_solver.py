@@ -136,26 +136,40 @@ def visualize_traffic(mdp, fig_file):
 
 
 
-def visualize_policy(pi):
+def visualize_policy(pi, mdp, fig_file):
     """
     Draw an arrow at every cell representing the turn we want to make.
     """
     a_to_vec = {Action.UP: (0,1), Action.RIGHT: (1,0), 
         Action.DOWN: (0,-1), Action.LEFT: (-1,0)}
-    # xy_to_vec = {(x,y): a_to_vec[a] for (x, y), a in pi.items}
 
     pi_arr = d_to_arr(pi)
     x_len, y_len = pi_arr.shape
     U = np.zeros_like(pi_arr)
     V = np.zeros_like(pi_arr)
 
+    # Conver policy to arrow directions with (u,v)
     for x, y in product(range(x_len), range(y_len)):
         U[x,y] = a_to_vec[pi_arr[x,y]][0]
         V[x,y] = a_to_vec[pi_arr[x,y]][1]
+
+    # Erase arrow for terminal state
+    x_term, y_term = mdp.terminal_state
+    U[x_term, y_term] = 0
+    V[x_term, y_term] = 0
     
-    X, Y = np.meshgrid(range(x_len), range(y_len))
+    X, Y = np.meshgrid(range(x_len), range(y_len), indexing='ij')
 
+    # Traffic fig to overlay
+    success_prob_to_idx = {.9: 0, .7: 1, .5: 2}
+    idxs = np.vectorize(lambda x: success_prob_to_idx[x])(mdp.state_traffics)
+
+    # Plot traffic + policy on top
     f, ax = plt.subplots()
-    plt.quiver(X, Y, V, U)
+    plt.imshow(idxs, cmap='RdYlGn', origin='lower')
+    plt.quiver(X, Y, U, V)
 
-    return U, V
+    plt.title('Policy on Traffic Grid')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    f.savefig(fig_file)
