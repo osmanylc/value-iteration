@@ -17,7 +17,6 @@ def value_iteration(mdp):
     residual = math.inf
     total_iterations = 10
 
-
     # ::::: Iterations of VI
     num_it = 0
     while residual > tolerance or num_it < total_iterations:
@@ -50,7 +49,8 @@ def value_iteration(mdp):
             v[s] = v_new
             # Record max residual
             residual = max(residual, abs(v_new - v_old))
-            print(f'residual: {residual:10.4f}')
+
+        print(f'residual: {residual:10.4f}')
     
     # ::::: Build the greedy policy
     print('\n::::: Building policy...')
@@ -62,7 +62,7 @@ def value_iteration(mdp):
         for act in acts:
             v_temp = 0
 
-            for (ss, r) , p_sa in mdp.p(s, act).items():
+            for (ss, r), p_sa in mdp.p(s, act).items():
                 v_temp += p_sa * (r + mdp.discount * v[ss])
             
             if v_temp > v_max:
@@ -115,6 +115,18 @@ def visualize_values(v, title, fig_file):
     f.savefig(fig_file)
 
 
+def visualize_values_2d(v, title, fig_file):
+    v_arr = d_to_arr(v)
+
+    f, _ = plt.subplots()
+    plt.imshow(v_arr, origin='lower', cmap='viridis')
+
+    plt.title(title)
+    plt.ylabel('y')
+    plt.xlabel('x')
+    f.savefig(fig_file)
+
+
 def visualize_traffic(mdp, fig_file):
     """
     Color the nodes depending on how much traffic they get. 
@@ -133,7 +145,6 @@ def visualize_traffic(mdp, fig_file):
     plt.xlabel('x')
     plt.ylabel('y')
     f.savefig(fig_file)
-
 
 
 def visualize_policy(pi, mdp, fig_file):
